@@ -1,9 +1,16 @@
 #include "ofApp.h"
 #define NUMBER_OF_KEYS 10 
+#define NUMBER_OF_LIGHT_SENSORS 2
 
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+    //loading a sound in
+    player.loadSound("Hello.mp3");
+   // player.play();
+    
+    cout << "hello" << endl;
+    
     ofSoundStreamSetup(2, 0, this, 44100, 256, 4);
     
     /*
@@ -21,6 +28,7 @@ void ofApp::setup(){
     // Here's the actual noise-making object
     Generator tone = SawtoothWave().freq( noteFreq );
     
+    
     // Let's put a filter on the tone
     tone = LPF12().input(tone).Q(2).cutoff((noteFreq * 2) + SineWave().freq(3) * 0.5 * noteFreq);
     
@@ -29,7 +37,7 @@ void ofApp::setup(){
     Generator toneWithEnvelope = tone * ADSR().attack(0.01).decay(1.5).sustain(0).release(0).trigger(envelopeTrigger).legato(true);
     
     // let's send the tone through some delay
-    Generator toneWithDelay = StereoDelay(0.5,.7).input(toneWithEnvelope).wetLevel(0.1).feedback(0.2);
+    Generator toneWithDelay = StereoDelay(0.5,0.75).input(toneWithEnvelope).wetLevel(0.1).feedback(0.2);
     
     synth.setOutputGen( toneWithDelay );
     ///arduio crap
@@ -39,10 +47,15 @@ void ofApp::setup(){
     for (int i =0; i < NUM_ARDS; i++) {
         ardVals.push_back(0);
     }
+    
+    
 }
 
 void ofApp::trigger(){
+    // sounds modulation is controlled by scaleDegree here, which is affected by average
     static int twoOctavePentatonicScale[10] = {0, 2, 4, 7, 9, 12, 14, 16, 19, 21};
+    
+    // takes the largest integral value that is produced by the formula using the Arduino value (average) to select a value between the pentatonic scale above, hence clamped of 0-9
     int degreeToTrigger = floor(ofClamp(scaleDegree, 0, 9));
     
     // set a parameter that we created when we defined the synth
@@ -68,31 +81,29 @@ void ofApp::setScaleDegreeBasedOnMouseX(){
 
 
 void ofApp::analogPinChanged(const int & pinNum) {
-        cout << "data recieved" << endl;
+    cout << "data recieved" << endl;
+    for (int i=0; i<NUMBER_OF_LIGHT_SENSORS; i++) {
     float value = ard.getAnalog(pinNum);
+    float valueMapped = ofMap(value, 0, 420, 0, 1023);
     switch (pinNum) {
         case 0:
-            ardVals[0] = value;
+            ardVals[0] = valueMapped;
             break;
         case 1:
-            ardVals[1] = value;
-            break;
-        case 2:
-            ardVals[2] = value;
-            break;
-        case 3:
-            ardVals[3] = value;
+            ardVals[1] = valueMapped;
             break;
         default:
             break;
     }
     float average =0;
-    average = (ardVals[0] + ardVals[1] +ardVals[2] + ardVals[3])/ardVals.size();
-    
+    //average = (ardVals[0] + ardVals[1])/ardVals.size(); - how does .size() work?
+    average = (ardVals[0] + ardVals[1])/NUMBER_OF_LIGHT_SENSORS;
+
     cout << average << endl;
-    cout << "data recieved" << endl;
+    //cout << "data recieved" << endl;
     trigger();
     
+    // HERE IS WHERE WE START TO TAKE THE AVERAGE VALUE AND USE IT TO CHANGE THE SYNTH PARAMETERS
     int newScaleDegree = average * NUMBER_OF_KEYS / ofGetWindowWidth();
     if(ofGetMousePressed() && ( newScaleDegree != scaleDegree )){
         scaleDegree = newScaleDegree;
@@ -101,6 +112,62 @@ void ofApp::analogPinChanged(const int & pinNum) {
         scaleDegree = newScaleDegree;
     }
     
+//    int lightVal = 1023 - ardVals[0];
+//    cout << lightVal << endl;
+    //create light that scales with average val
+    //ard.sendPwm(9, (average));
+    
+
+    DELAY(1000);
+    
+    
+    //create a modulating RGB light based on average val
+    
+    // RGB is on when in LOW condition
+    if (average < 200) {
+        ard.sendDigital(9, ARD_LOW);
+        ard.sendDigital(10, ARD_HIGH);
+        ard.sendDigital(11, ARD_HIGH);
+    } else if (average >= 200 && average < 350) {
+        ard.sendDigital(9, ARD_LOW);
+        ard.sendDigital(10, ARD_LOW);
+        ard.sendDigital(11, ARD_HIGH);
+    } else if (average >= 350 && average < 500) {
+        ard.sendDigital(9, ARD_HIGH);
+        ard.sendDigital(10, ARD_LOW);
+        ard.sendDigital(11, ARD_HIGH);
+    } else if (average >= 500 && average < 650) {
+        ard.sendDigital(9, ARD_HIGH);
+        ard.sendDigital(10, ARD_LOW);
+        ard.sendDigital(11, ARD_LOW);
+    } else if(average >= 650) {
+        ard.sendDigital(9, ARD_HIGH);
+        ard.sendDigital(10, ARD_HIGH);
+        ard.sendDigital(11, ARD_LOW);
+    }
+    }
+    
+  
+    
+    float valueSound = ard.getAnalog(2);
+     //ard.sendPwm(7, valueSound);
+    if (valueSound < 650) {
+        ard.sendDigital(7, ARD_LOW);
+        //player.stop();
+    }   else if (valueSound > 650) {
+        ard.sendDigital(7, ARD_HIGH);
+        player.play();
+        DELAY(2000);
+        //player.stop();
+    }
+    
+    //float valueTouch = ard.getAnalog(3);
+    //float valueTouchMapped = ofMap(valueTouch, 350, 670, 0, 1024);
+    
+    
+    for (int i=0; i<4; i++) {
+        cout << "ard val " << i << "=" << ard.getAnalog(i) << endl;
+    }
 }
 
 void ofApp::setupArd(const int &version){
@@ -114,6 +181,17 @@ void ofApp::setupArd(const int &version){
     ard.sendAnalogPinReporting(3, ARD_ANALOG);
     ofAddListener(ard.EAnalogPinChanged, this, &ofApp::analogPinChanged);
     
+    // if want to set pin D11 as PWM (analog output)
+    //ard.sendDigitalPinMode(9, ARD_PWM);
+    //ard.sendDigitalPinMode(10, ARD_PWM);
+    //ard.sendDigitalPinMode(11, ARD_PWM);
+    
+    // send the project digital output
+    ard.sendDigitalPinMode(7, ARD_OUTPUT);
+    ard.sendDigitalPinMode(9, ARD_OUTPUT);
+    ard.sendDigitalPinMode(10, ARD_OUTPUT);
+    ard.sendDigitalPinMode(11, ARD_OUTPUT);
+    
     //like say you'd want to send in data instead, do this.
     //ard.sendDigitalPinMode(9, ARD_INPUT);
     cout << "up" <<endl;
@@ -122,7 +200,6 @@ void ofApp::setupArd(const int &version){
 void ofApp::update(){
     //update Arduino
     ard.update();
-    
 
 }
 
@@ -187,4 +264,5 @@ void ofApp::dragEvent(ofDragInfo dragInfo){
 }
 void ofApp::audioRequested (float * output, int bufferSize, int nChannels){
     synth.fillBufferOfFloats(output, bufferSize, nChannels);
+    
 }
