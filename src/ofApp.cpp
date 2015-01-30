@@ -28,9 +28,8 @@ void ofApp::setup(){
     // Here's the actual noise-making object
     Generator tone = SawtoothWave().freq( noteFreq );
     
-    
     // Let's put a filter on the tone
-    tone = LPF12().input(tone).Q(2).cutoff((noteFreq * 2) + SineWave().freq(3) * 0.5 * noteFreq);
+    tone = LPF12().input(tone).Q(2).cutoff((noteFreq * 2) + SineWave().freq(0.2) * 0.5 * noteFreq);
     
     // It's just a steady tone until we modulate the amplitude with an envelope
     ControlGenerator envelopeTrigger = synth.addParameter("trigger");
@@ -41,13 +40,12 @@ void ofApp::setup(){
     
     synth.setOutputGen( toneWithDelay );
     ///arduio crap
-    ard.connect("/dev/tty.usbmodem1421", 57600);
+    ard.connect("/dev/tty.usbmodem1411", 57600);
     ofAddListener(ard.EInitialized, this, &ofApp::setupArd);
     
     for (int i =0; i < NUM_ARDS; i++) {
         ardVals.push_back(0);
     }
-    
     
 }
 
@@ -65,7 +63,6 @@ void ofApp::trigger(){
     // using them as triggers
     synth.setParameter("trigger", 1);
     
-
 }
 
 //--------------------------------------------------------------
@@ -102,7 +99,7 @@ void ofApp::analogPinChanged(const int & pinNum) {
     cout << average << endl;
     //cout << "data recieved" << endl;
     trigger();
-    
+        
     // HERE IS WHERE WE START TO TAKE THE AVERAGE VALUE AND USE IT TO CHANGE THE SYNTH PARAMETERS
     int newScaleDegree = average * NUMBER_OF_KEYS / ofGetWindowWidth();
     if(ofGetMousePressed() && ( newScaleDegree != scaleDegree )){
@@ -112,14 +109,51 @@ void ofApp::analogPinChanged(const int & pinNum) {
         scaleDegree = newScaleDegree;
     }
     
+    // valueTouch1 and valueTouch2 are inputs for the touch sensors. At the moment I have them connected to a sound clip but as a trigger so it would be good to switch to a changing pitch as well.
+    // digital out 9 controls the LEDs in the tree tops.
+    
+    float valueTouch1 = ard.getAnalog(2);
+    float valueTouch2 = ard.getAnalog(3);
+        
+    //ard.sendPwm(7, valueSound);
+        
+    // valueSound are inputs for the voice sensor
+    // digital out 7 controls the LEDs in the cloud.
+
+    if (valueTouch1 < 500) {
+        ard.sendDigital(8, ARD_LOW);
+        //player.stop();
+    }   else if (valueTouch1 > 500) {
+        ard.sendDigital(8, ARD_HIGH);
+        player.play();
+        DELAY(2000);
+        //player.stop();
+    }
+    
+    
+    float valueSound = ard.getAnalog(4);
+        
+    if (valueSound < 650) {
+        ard.sendDigital(7, ARD_LOW);
+        //player.stop();
+    }   else if (valueSound > 650) {
+        ard.sendDigital(7, ARD_HIGH);
+        player.play();
+        DELAY(2000);
+        //player.stop();
+    }
+        
+    //ard.sendPwm(7, valueSound);
+        
+   
+
+    
 //    int lightVal = 1023 - ardVals[0];
 //    cout << lightVal << endl;
     //create light that scales with average val
     //ard.sendPwm(9, (average));
-    
 
     DELAY(1000);
-    
     
     //create a modulating RGB light based on average val
     
@@ -147,25 +181,10 @@ void ofApp::analogPinChanged(const int & pinNum) {
     }
     }
     
-  
-    
-    float valueSound = ard.getAnalog(2);
-     //ard.sendPwm(7, valueSound);
-    if (valueSound < 650) {
-        ard.sendDigital(7, ARD_LOW);
-        //player.stop();
-    }   else if (valueSound > 650) {
-        ard.sendDigital(7, ARD_HIGH);
-        player.play();
-        DELAY(2000);
-        //player.stop();
-    }
-    
     //float valueTouch = ard.getAnalog(3);
     //float valueTouchMapped = ofMap(valueTouch, 350, 670, 0, 1024);
     
-    
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<5; i++) {
         cout << "ard val " << i << "=" << ard.getAnalog(i) << endl;
     }
 }
@@ -179,6 +198,7 @@ void ofApp::setupArd(const int &version){
     ard.sendAnalogPinReporting(1, ARD_ANALOG);
     ard.sendAnalogPinReporting(2, ARD_ANALOG);
     ard.sendAnalogPinReporting(3, ARD_ANALOG);
+    ard.sendAnalogPinReporting(4, ARD_ANALOG);
     ofAddListener(ard.EAnalogPinChanged, this, &ofApp::analogPinChanged);
     
     // if want to set pin D11 as PWM (analog output)
