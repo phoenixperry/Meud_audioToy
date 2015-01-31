@@ -7,7 +7,10 @@
 void ofApp::setup(){
     //loading a sound in
     player.loadSound("Hello.mp3");
-   // player.play();
+    note1.loadSound("note1.mp3");
+    note2.loadSound("note2.mp3");
+    note3.loadSound("note3.mp3");
+    note4.loadSound("note4.mp3");
     
     cout << "hello" << endl;
     
@@ -112,24 +115,42 @@ void ofApp::analogPinChanged(const int & pinNum) {
     // valueTouch1 and valueTouch2 are inputs for the touch sensors. At the moment I have them connected to a sound clip but as a trigger so it would be good to switch to a changing pitch as well.
     // digital out 9 controls the LEDs in the tree tops.
     
-    float valueTouch1 = ard.getAnalog(2);
-    float valueTouch2 = ard.getAnalog(3);
+        float valueTouch1 = ard.getAnalog(2);
+        float valueTouch2 = ard.getAnalog(3);
+        float average2 = 0;
+        average2 = (valueTouch1 + valueTouch2) / 2;
         
     //ard.sendPwm(7, valueSound);
         
     // valueSound are inputs for the voice sensor
     // digital out 7 controls the LEDs in the cloud.
 
-    if (valueTouch1 < 500) {
+    if (average2 < 300) {
         ard.sendDigital(8, ARD_LOW);
         //player.stop();
-    }   else if (valueTouch1 > 500) {
+    }   else if (average2 > 300 && average2 < 450) {
         ard.sendDigital(8, ARD_HIGH);
-        player.play();
+        note1.play();
+        note1.setVolume(0.1f);
         DELAY(2000);
         //player.stop();
+    }   else if (average2 > 450 && average2 < 600) {
+        ard.sendDigital(8, ARD_HIGH);
+        note2.play();
+        note2.setVolume(0.1f);
+        DELAY(2000);
+        //player.stop();
+    }  else if (average2 > 600 && average2 < 850) {
+        ard.sendDigital(8, ARD_HIGH);
+        note4.play();
+        note4.setVolume(0.1f);
+        DELAY(2000);
+    } else if (average2 > 850 && average2 < 1000) {
+        ard.sendDigital(8, ARD_HIGH);
+        note3.play();
+        note3.setVolume(0.1f);
+        DELAY(2000);
     }
-    
     
     float valueSound = ard.getAnalog(4);
         
@@ -145,9 +166,6 @@ void ofApp::analogPinChanged(const int & pinNum) {
         
     //ard.sendPwm(7, valueSound);
         
-   
-
-    
 //    int lightVal = 1023 - ardVals[0];
 //    cout << lightVal << endl;
     //create light that scales with average val

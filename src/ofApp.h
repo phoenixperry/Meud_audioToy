@@ -33,5 +33,9 @@ private:
         void analogPinChanged(const int &pinNum);
         float lightLevel;
         vector<float> ardVals;
+        ofSoundPlayer note1;
+        ofSoundPlayer note2;
+        ofSoundPlayer note3;
+        ofSoundPlayer note4;
         ofSoundPlayer player;
 };
